@@ -1,0 +1,64 @@
+name: "Increment Version"
+
+description: "Reusable action to install cider globally and increment version numbers"
+
+inputs:
+  version-type:
+    description: "Type of version increment (major, minor, patch, or build)"
+    required: true
+    default: "patch"
+
+outputs:
+  sem_version:
+    description: "The new version number (major.minor.patch)"
+    value: ${{ steps.display_new_version.outputs.sem_version }}
+  build_number:
+    description: "The new build number (build)"
+    value: ${{ steps.display_new_version.outputs.build_number }}
+  full_version:
+    description: "The new version number (major.minor.patch)+build"
+    value: ${{ steps.display_new_version.outputs.full_version }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Flutter via fvm
+      uses: applabs-hq/shared-workflows/.github/actions/flutter/install-flutter@main
+
+    - name: Install cider globally
+      shell: bash
+      run: |
+        fvm flutter pub global activate cider
+
+    - name: Increment version keeping build number
+      shell: bash
+      run: |
+        case "${{ inputs.version-type }}" in
+          "major")
+            fvm flutter pub global run cider bump major --keep-build
+            ;;
+          "minor")
+            fvm flutter pub global run cider bump minor --keep-build
+            ;;
+          "patch")
+            fvm flutter pub global run cider bump patch --keep-build
+            ;;
+          "build")
+            fvm flutter pub global run cider bump build
+            ;;
+          *)
+            echo "Invalid version type: ${{ inputs.version-type }}"
+            echo "Valid options are: major, minor, patch, build"
+            exit 1
+            ;;
+        esac
+
+    - name: Display new version
+      id: display_new_version
+      shell: bash
+      run: |
+        echo "New version: $(fvm flutter pub global run cider version)"
+        echo "New build number: $(fvm flutter pub global run cider build)"
+        echo "sem_version=$(fvm flutter pub global run cider version | cut -d'+' -f1)" >> $GITHUB_OUTPUT
+        echo "build_number=$(fvm flutter pub global run cider version | cut -d'+' -f2)" >> $GITHUB_OUTPUT
+        echo "full_version=$(fvm flutter pub global run cider version)" >> $GITHUB_OUTPUT

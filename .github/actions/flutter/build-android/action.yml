@@ -1,0 +1,119 @@
+name: "Build Android App"
+
+description: "Reusable action to build Android app"
+
+inputs:
+  android_signing_key:
+    description: "Base64 encoded Android signing key"
+    required: true
+  android_store_password:
+    description: "Android keystore password"
+    required: true
+  android_key_password:
+    description: "Android key password"
+    required: true
+  android_key_alias:
+    description: "Android key alias"
+    required: true
+  ci_runner_github_pat:
+    description: "GitHub PAT for CI access to private repos"
+    required: true
+  flutter_version:
+    description: "Flutter version from .fvmrc"
+    required: true
+  sem_version:
+    description: "Sem version from cider"
+    required: true
+  build_number:
+    description: "Build number from cider"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    # Cache build outputs
+    - name: Cache build outputs
+      uses: actions/cache@v4
+      with:
+        path: |
+          build/
+          android/.gradle/
+          android/app/build/
+        key: ${{ runner.os }}-build-${{ inputs.flutter_version }}-${{ hashFiles('**/pubspec.lock', '**/.fvmrc') }}
+        restore-keys: |
+          ${{ runner.os }}-build-
+
+    - name: Cache Gradle Wrapper
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/wrapper
+          android/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-wrapper-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-wrapper-
+
+    - name: Cache Gradle Dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/notifications
+          ~/.gradle/daemon
+        key: ${{ runner.os }}-gradle-cache-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/build.gradle', 'android/app/build.gradle') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-cache-
+
+    # Setup Android app signing files
+    - name: Setup Android signing
+      shell: bash
+      working-directory: android
+      run: |
+        # Create keystore file from base64
+        echo "${{ inputs.android_signing_key }}" | base64 -d > upload-keystore.jks
+
+        # Create key.properties file
+        cat > key.properties << EOF
+        storePassword=${{ inputs.android_store_password }}
+        keyPassword=${{ inputs.android_key_password }}
+        keyAlias=${{ inputs.android_key_alias }}
+        storeFile=../upload-keystore.jks
+        EOF
+
+    # Generate local.properties file for gradle
+    - name: Generate local.properties
+      shell: bash
+      working-directory: android
+      run: |
+        echo "sdk.dir=$ANDROID_HOME" >> local.properties
+        echo "flutter.sdk=${{ github.workspace }}/.fvm/flutter_sdk" >> local.properties
+        cat local.properties
+
+    # Warmup gradle to avoid cold start, use cached dependencies
+    - name: Gradle warmup
+      shell: bash
+      working-directory: android
+      run: |
+        ./gradlew --version --no-daemon
+        ./gradlew dependencies --no-daemon
+
+    # Build APK for release
+    - name: Build APK for release
+      shell: bash
+      run: |
+        fvm flutter build apk --release
+
+    # Restore original pubspec.yaml
+    - name: Restore pubspec.yaml
+      shell: bash
+      run: |
+        mv pubspec.yaml.backup pubspec.yaml
+        echo "Restored original pubspec.yaml"
+
+    # Upload APK artifact
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-release-${{ inputs.sem_version }}
+        path: build/app/outputs/apk/release/app-release.apk
+        retention-days: 30

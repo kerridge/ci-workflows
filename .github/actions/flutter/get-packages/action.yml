@@ -1,0 +1,11 @@
+name: Get Packages
+
+description: "Gets Flutter packages and private packages"
+
+runs:
+  using: "composite"
+  steps:
+    # Get Flutter packages
+    - name: Get Flutter packages
+      shell: bash
+      run: fvm flutter pub get

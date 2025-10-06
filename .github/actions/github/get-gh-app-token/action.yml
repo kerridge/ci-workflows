@@ -1,0 +1,30 @@
+name: Get Github App token
+
+inputs:
+  app-id:
+    description: The ID of the GitHub App
+    required: true
+  private-key:
+    description: The private key of the GitHub App
+    required: true
+
+outputs:
+  token:
+    description: The token of the GitHub App
+    value: ${{ steps.generate-token.outputs.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate a token
+      id: generate-token
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.private-key }}
+
+    - name: Set git config
+      shell: bash
+      run: |
+        git config --global user.name "clippy-ci[bot]"
+        git config --global user.email "clippy-ci[bot]-${{ inputs.app-id }}@applabs.com"

@@ -1,0 +1,114 @@
+name: "Install Flutter"
+
+description: "Installs Flutter via fvm"
+
+outputs:
+  flutter_version:
+    description: "The version of Flutter installed"
+    value: ${{ steps.flutter_version.outputs.flutter_version }}
+  package_version:
+    description: "The version of the package installed"
+    value: ${{ steps.package_version.outputs.package_version }}
+  sem_version:
+    description: "The sem version of the package installed"
+    value: ${{ steps.package_version.outputs.sem_version }}
+  build_number:
+    description: "The build number of the package installed"
+    value: ${{ steps.package_version.outputs.build_number }}
+
+runs:
+  using: "composite"
+  steps:
+    # Capture Flutter version from .fvmrc
+    - name: Capture Flutter version
+      id: flutter_version
+      shell: bash
+      run: |
+        # Check if .fvmrc exists
+        if [ ! -f .fvmrc ]; then
+          echo "Error: .fvmrc file not found"
+          exit 1
+        fi
+
+        # Read Flutter version from .fvmrc
+        FLUTTER_VERSION=$(cat .fvmrc | jq -r '.flutter')
+
+        # Validate that we got a valid version
+        if [ -z "$FLUTTER_VERSION" ] || [ "$FLUTTER_VERSION" = "null" ]; then
+          echo "Error: Could not extract Flutter version from .fvmrc"
+          exit 1
+        fi
+
+        echo "flutter_version=$FLUTTER_VERSION" >> $GITHUB_OUTPUT
+        echo "Flutter version from .fvmrc: $FLUTTER_VERSION"
+
+    # Cache Flutter dependencies
+    - name: Cache Flutter dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/.pub-cache
+          ${{ github.workspace }}/.fvm
+          ${{ github.workspace }}/.fvm/versions
+          ${{ github.workspace }}/.fvm/flutter_sdk
+          ${{ github.workspace }}/.fvm/versions/*
+          $HOME/.pub-cache
+          $HOME/fvm/versions/**
+          $HOME/fvm/versions/*
+          /home/runner/fvm/versions/${{ steps.flutter_version.outputs.flutter_version }}
+          $HOME/fvm/versions/${{ steps.flutter_version.outputs.flutter_version }}
+
+        key: ${{ runner.os }}-flutter-${{ steps.flutter_version.outputs.flutter_version }}-${{ hashFiles('**/pubspec.lock', '**/.fvmrc') }}
+        restore-keys: |
+          ${{ runner.os }}-flutter-
+
+    # Install fvm
+    - name: Install fvm
+      shell: bash
+      run: |
+        curl -fsSL https://fvm.app/install.sh | bash
+        echo "$HOME/.pub-cache/bin" >> $GITHUB_PATH
+        echo "$HOME/.fvm/bin" >> $GITHUB_PATH
+
+        # Verify fvm installation
+        echo "fvm version: $(fvm --version)"
+        echo "fvm location: $(which fvm)"
+        echo "PATH: $PATH"
+
+    # Install Flutter via fvm
+    - name: Install Flutter via fvm
+      shell: bash
+      run: |
+        # Install Flutter via fvm
+        fvm install --setup --verbose
+
+        fvm config --no-use-git-cache
+        fvm config --no-update-check
+
+        # Verify installation
+        echo "fvm list"
+        fvm list
+
+    # Verify Flutter installation
+    - name: Verify Flutter installation
+      shell: bash
+      run: |
+        fvm flutter --version
+        fvm flutter doctor -v
+
+    # Install cider globally
+    - name: Install cider globally
+      shell: bash
+      run: |
+        fvm flutter pub global activate cider
+
+    # Capture Flutter package version using cider
+    - name: Capture Flutter package version using cider
+      id: package_version
+      shell: bash
+      run: |
+        VERSION=$(fvm flutter pub global run cider version)
+        echo "sem_version=$(fvm flutter pub global run cider version | cut -d'+' -f1)" >> $GITHUB_OUTPUT
+        echo "build_number=$(fvm flutter pub global run cider version | cut -d'+' -f2)" >> $GITHUB_OUTPUT
+        echo "package_version=$(fvm flutter pub global run cider version)" >> $GITHUB_OUTPUT
+        echo "Flutter package version: $VERSION"

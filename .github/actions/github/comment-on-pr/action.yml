@@ -1,0 +1,24 @@
+name: Comment on PR
+
+description: "Comment on a PR"
+
+inputs:
+  github-token:
+    description: "The GitHub token to use"
+    required: true
+  comment-tag:
+    description: "Used as an ID to update the comment"
+    required: false
+  message:
+    description: "The message to comment on the PR"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Comment PR
+      uses: thollander/actions-comment-pull-request@v3
+      with:
+        github-token: ${{ inputs.github-token }}
+        comment-tag: ${{ inputs.comment-tag }}
+        message: ${{ inputs.message }}

@@ -1,0 +1,13 @@
+name: Run build runner
+
+description: "Runs the build runner to generate code"
+
+runs:
+  using: "composite"
+  steps:
+    # Run build runner to generate code
+    - name: Generate code with build runner
+      shell: bash
+      run: |
+        # Regenerate all code - will fail if there are conflicts with existing generated files
+        fvm flutter pub run build_runner build
