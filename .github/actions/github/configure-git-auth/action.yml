@@ -1,0 +1,21 @@
+name: "Configure Git Authentication"
+
+description: "Configures Git authentication"
+
+inputs:
+  ci_runner_github_pat:
+    description: "CI Runner GitHub PAT"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Configure Git for private repos
+      shell: bash
+      run: |
+        # Configure Git to use token for HTTPS URLs
+        git config --global --add url."https://${{ inputs.ci_runner_github_pat }}:x-oauth-basic@github".insteadOf ssh://git@github
+        git config --global --add url."https://${{ inputs.ci_runner_github_pat }}:x-oauth-basic@github".insteadOf https://github
+        git config --global --add url."https://${{ inputs.ci_runner_github_pat }}:x-oauth-basic@github".insteadOf git@github
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
